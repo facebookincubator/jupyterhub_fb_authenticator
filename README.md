@@ -3,7 +3,13 @@ JupyterHub Facebook Authenticator is a Facebook OAuth authenticator built on top
 
 
 ## How FBAuthenticator works
-See example in jupyterhub_config.py
+Enable FBAuthenticator in jupyterhub_config.py
+```python
+from fbauthenticator.authenticator import FBAuthenticator
+c.JupyterHub.authenticator_class = FBAuthenticator
+c.FBAuthenticator.client_id = 'app_id'
+c.FBAuthenticator.client_secret = 'app_secret'
+```
 
 See the [CONTRIBUTING](CONTRIBUTING.md) file for how to help out.
 
