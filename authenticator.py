@@ -6,9 +6,13 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
+"""
+Custom Jupyterhub Authenticator to use Facebook OAuth.
+"""
 
 import json
 import os
+import urllib
 
 from jupyterhub.auth import LocalAuthenticator
 from oauthenticator.oauth2 import OAuthenticator, OAuthLoginHandler
@@ -16,6 +20,7 @@ from tornado import gen
 from tornado.auth import OAuth2Mixin
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 from tornado.httputil import url_concat
+from tornado.web import HTTPError
 from traitlets import Bool, Dict, Unicode
 
 
@@ -29,6 +34,7 @@ class FBLoginHandler(OAuthLoginHandler, GenericEnvMixin):
 
 
 class FBAuthenticator(OAuthenticator):
+    FB_GRAPH_EP = "https://graph.facebook.com"
 
     login_service = Unicode("Facebook", config=True)
 
@@ -39,6 +45,7 @@ class FBAuthenticator(OAuthenticator):
         config=True,
         help="Access token endpoint URL",
     )
+
     extra_params = Dict(help="Extra parameters for first POST request").tag(config=True)
 
     tls_verify = Bool(
@@ -47,23 +54,10 @@ class FBAuthenticator(OAuthenticator):
         help="Disable TLS verification on http request",
     )
 
-    async def _http_get(self, url):
-        http_client = AsyncHTTPClient()
-        headers = {"Accept": "application/json", "User-Agent": "JupyterHub"}
-        req = HTTPRequest(
-            url, method="GET", headers=headers, validate_cert=self.tls_verify
-        )
-        resp = await http_client.fetch(req)
-        return json.loads(resp.body.decode("utf8", "replace"))
-
-    async def _get_user_name(self, access_token):
-        url = f"https://graph.facebook.com/me?fields=name&access_token={access_token}"
-        resp_json = await self._http_get(url)
-        return resp_json["name"]
-
     async def authenticate(self, handler, data=None):
         code = handler.get_argument("code")
 
+        # get app user id
         params = {
             "client_id": self.client_id,
             "redirect_uri": self.get_callback_url(handler),
@@ -80,16 +74,36 @@ class FBAuthenticator(OAuthenticator):
 
         url = url_concat(url, params)
         resp_json = await self._http_get(url)
-
         access_token = resp_json["access_token"]
-        user_name = await self._get_user_name(access_token)
-        return {
-            "name": user_name,
-            "auth_state": {
-                "access_token": access_token,
-                "fb_user": {"username": user_name},
-            },
-        }
+        user_id = await self._get_user_id(access_token)
+
+        return await self.authorize(access_token, user_id)
+
+    async def _http_get(self, url):
+        http_client = AsyncHTTPClient()
+        headers = {"Accept": "application/json", "User-Agent": "JupyterHub"}
+        req = HTTPRequest(
+            url, method="GET", headers=headers, validate_cert=self.tls_verify
+        )
+        resp = await http_client.fetch(req)
+        return json.loads(resp.body.decode("utf8", "replace"))
+
+    async def _get_user_id(self, access_token):
+        """
+        Return user id of the given user.
+        Throw a HTTP 500 error otherwise.
+        """
+        try:
+            url = f"{FBAuthenticator.FB_GRAPH_EP}/me?fields=id&access_token={access_token}"
+            with urllib.request.urlopen(url) as response:
+                body = response.read()
+                user = json.loads(body)
+                return user["id"]
+        except Exception:
+            raise HTTPError(500, "Failed to get user ID")
+
+    async def authorize(self, access_token, user_id):
+        raise NotImplementedError()
 
     @gen.coroutine
     def pre_spawn_start(self, user, spawner):
@@ -101,6 +115,7 @@ class FBAuthenticator(OAuthenticator):
 
 
 class LocalFBAuthenticator(LocalAuthenticator, FBAuthenticator):
+
     """A version that mixes in local system user creation"""
 
     pass
