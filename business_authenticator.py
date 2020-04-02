@@ -22,6 +22,7 @@ from .authenticator import FBAuthenticator
 class FBBusinessAuthenticator(FBAuthenticator):
 
     BUSINESS_ID = os.environ.get("BUSINESS_ID")
+    PAGE_THRESHOLD = 100
 
     async def authorize(self, access_token, user_id):
         # check if the user has business management permission
@@ -69,12 +70,48 @@ class FBBusinessAuthenticator(FBAuthenticator):
         Return true if the user is in the given business, false if not.
         Throw a HTTP 500 error otherwise.
         """
-        # TODO: Handle pagenation
         try:
-            url = f"{FBAuthenticator.FB_GRAPH_EP}/me/business_users/?business={self.BUSINESS_ID}&access_token={access_token}"
+            url = f"{FBAuthenticator.FB_GRAPH_EP}/me/business_users?access_token={access_token}"
             with urllib.request.urlopen(url) as response:
                 body = response.read()
                 body_json = json.loads(body)
-                return body_json["data"]
+                return await self._check_in_page(body_json, 1)
         except Exception:
             raise HTTPError(500, "Authorization failed")
+
+    async def _check_in_page(self, body_json, current_page):
+        """
+        Return false if the current page is larger thatn the threshold.
+        Return true if the user is in the given page.
+        Then recursively check the next page if it exists, return false if not.
+        Throw a HTTP 500 error otherwise.
+        """
+        if current_page > self.PAGE_THRESHOLD:
+            return False
+
+        if self._has_business(body_json["data"]):
+            return True
+
+        paging = body_json["paging"]
+        if "next" not in paging:
+            return False
+
+        try:
+            next_page_url = paging["next"]
+            with urllib.request.urlopen(next_page_url) as response:
+                body = response.read()
+                return await self._check_in_page(json.loads(body), current_page + 1)
+        except Exception:
+            raise HTTPError(500, "Authorization failed")
+
+    def _has_business(self, data):
+        """
+        Given the data of one page of business users, check if the user is in the business.
+        Return true if the user is in the business, false otherwise.
+        """
+        return any(
+            "business" in entry
+            and "id" in entry["business"]
+            and entry["business"]["id"] == self.BUSINESS_ID
+            for entry in data
+        )
