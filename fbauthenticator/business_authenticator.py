@@ -94,7 +94,7 @@ class FBBusinessAuthenticator(FBAuthenticator):
         if self._has_business(body_json["data"]):
             return True
 
-        paging = body_json["paging"]
+        paging = body_json.get("paging", {})
         if "next" not in paging:
             return False
 
