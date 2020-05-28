@@ -27,8 +27,9 @@ class FBBusinessAuthenticator(FBAuthenticator):
     PAGE_THRESHOLD = 100
 
     async def authorize(self, access_token, user_id):
+        proof = self._get_app_secret_proof(access_token)
         # check if the user has business management permission
-        if not await self._check_permission(access_token, "business_management"):
+        if not await self._check_permission(access_token, "business_management", proof):
             self.log.warning(
                 "User %s doesn't have business management permission", user_id
             )
@@ -38,7 +39,7 @@ class FBBusinessAuthenticator(FBAuthenticator):
         self.log.info("User %s passed business management permission check", user_id)
 
         # check if the user is in the business
-        if not await self._check_in_business(access_token):
+        if not await self._check_in_business(access_token, proof):
             self.log.warning(
                 "User %s is not in the business %s", user_id, self.BUSINESS_ID
             )
@@ -53,13 +54,13 @@ class FBBusinessAuthenticator(FBAuthenticator):
             },
         }
 
-    async def _check_permission(self, access_token, permission):
+    async def _check_permission(self, access_token, permission, proof):
         """
         Return true if the user has the given permission, false if not.
         Throw a HTTP 500 error otherwise.
         """
         try:
-            url = f"{FBAuthenticator.FB_GRAPH_EP}/me/permissions/?permission={permission}&access_token={access_token}"
+            url = f"{FBAuthenticator.FB_GRAPH_EP}/me/permissions/?permission={permission}&access_token={access_token}&appsecret_proof={proof}"
             with urllib.request.urlopen(url) as response:
                 body = response.read()
                 permission = json.loads(body).get("data")
@@ -67,13 +68,13 @@ class FBBusinessAuthenticator(FBAuthenticator):
         except Exception:
             raise HTTPError(500, "Failed to check permission")
 
-    async def _check_in_business(self, access_token):
+    async def _check_in_business(self, access_token, proof):
         """
         Return true if the user is in the given business, false if not.
         Throw a HTTP 500 error otherwise.
         """
         try:
-            url = f"{FBAuthenticator.FB_GRAPH_EP}/me/business_users?access_token={access_token}"
+            url = f"{FBAuthenticator.FB_GRAPH_EP}/me/business_users?access_token={access_token}&appsecret_proof={proof}"
             with urllib.request.urlopen(url) as response:
                 body = response.read()
                 body_json = json.loads(body)
