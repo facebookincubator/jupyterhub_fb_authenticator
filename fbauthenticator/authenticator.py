@@ -13,6 +13,8 @@ Custom Jupyterhub Authenticator to use Facebook OAuth.
 import json
 import os
 import urllib
+import hmac
+import hashlib
 
 from jupyterhub.auth import LocalAuthenticator
 from oauthenticator.oauth2 import OAuthenticator, OAuthLoginHandler
@@ -57,7 +59,6 @@ class FBAuthenticator(OAuthenticator):
     async def authenticate(self, handler, data=None):
         code = handler.get_argument("code")
 
-        # get app user id
         params = {
             "client_id": self.client_id,
             "redirect_uri": self.get_callback_url(handler),
@@ -94,16 +95,26 @@ class FBAuthenticator(OAuthenticator):
         Throw a HTTP 500 error otherwise.
         """
         try:
-            url = f"{FBAuthenticator.FB_GRAPH_EP}/me?fields=id&access_token={access_token}"
+            proof = self._get_app_secret_proof(access_token)
+            url = f"{FBAuthenticator.FB_GRAPH_EP}/me?fields=id&access_token={access_token}&appsecret_proof={proof}"
             with urllib.request.urlopen(url) as response:
                 body = response.read()
                 user = json.loads(body)
                 return user["id"]
-        except Exception:
-            raise HTTPError(500, "Failed to get user ID")
+        except Exception as e:
+            self.log.error("Failed to get user ID", exc_info=True)
+            raise HTTPError(500, "Failed to get user ID") from e
 
     async def authorize(self, access_token, user_id):
         raise NotImplementedError()
+
+    def _get_app_secret_proof(self, access_token):
+        """ Generate the app_secret_proof """
+        return hmac.new(
+            self.client_secret.encode(),
+            access_token.encode(),
+            hashlib.sha256
+        ).hexdigest()
 
     @gen.coroutine
     def pre_spawn_start(self, user, spawner):
