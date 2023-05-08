@@ -10,11 +10,11 @@
 Custom Jupyterhub Authenticator to use Facebook OAuth.
 """
 
+import hashlib
+import hmac
 import json
 import os
 import urllib
-import hmac
-import hashlib
 
 from jupyterhub.auth import LocalAuthenticator
 from oauthenticator.oauth2 import OAuthenticator, OAuthLoginHandler
@@ -109,11 +109,9 @@ class FBAuthenticator(OAuthenticator):
         raise NotImplementedError()
 
     def _get_app_secret_proof(self, access_token):
-        """ Generate the app_secret_proof """
+        """Generate the app_secret_proof"""
         return hmac.new(
-            self.client_secret.encode(),
-            access_token.encode(),
-            hashlib.sha256
+            self.client_secret.encode(), access_token.encode(), hashlib.sha256
         ).hexdigest()
 
     @gen.coroutine
