@@ -73,13 +73,16 @@ class FBDelegateBearerAuthenticator(FBAuthenticator):
                 }
         except urllib.error.HTTPError as e:
             if e.code in self.EXPECTED_ERROR_CODES:
-                self.log.warning("User failed delegate Auth Check", exc_info=True)
+                self.log.warning(
+                    f"User failed delegate Auth Check : {e.code} : {e.reason}",
+                    exc_info=True,
+                )
                 raise HTTPError(
                     403, f"You are not authorized (delegate code: {e.code})"
                 )
             else:
                 self.log.exception(
-                    "Authorization failed with an unexpected HTTPError code"
+                    f"Authorization failed with an unexpected HTTPError code : {e.code} : {e.message}"
                 )
                 # We don't expect this code - treat as internal server error.
                 raise HTTPError(500, f"Authorization failed (delegate code: {e.code})")
