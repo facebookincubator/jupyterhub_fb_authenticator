@@ -124,7 +124,6 @@ class FBAuthenticator(OAuthenticator):
 
 
 class LocalFBAuthenticator(LocalAuthenticator, FBAuthenticator):
-
     """A version that mixes in local system user creation"""
 
     pass
