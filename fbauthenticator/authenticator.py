@@ -80,6 +80,17 @@ class FBAuthenticator(OAuthenticator):
 
         return await self.authorize(access_token, user_id)
 
+    async def refresh_user(self, user, handler=None):
+        auth_state = user.get_auth_state()
+        access_token = auth_state.get("access_token", "")
+        user_id = await self._get_user_id(access_token)
+
+        try:
+            return await self.authorize(access_token, user_id)
+        except Exception:
+            self.log.error("Failed to refresh user", exc_info=True)
+            return False
+
     async def _http_get(self, url):
         http_client = AsyncHTTPClient()
         headers = {"Accept": "application/json", "User-Agent": "JupyterHub"}
