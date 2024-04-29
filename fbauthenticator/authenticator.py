@@ -81,7 +81,7 @@ class FBAuthenticator(OAuthenticator):
         return await self.authorize(access_token, user_id)
 
     async def refresh_user(self, user, handler=None):
-        auth_state = user.get_auth_state()
+        auth_state = await user.get_auth_state()
         access_token = auth_state.get("access_token", "")
         user_id = await self._get_user_id(access_token)
 
