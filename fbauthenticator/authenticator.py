@@ -81,11 +81,12 @@ class FBAuthenticator(OAuthenticator):
         return await self.authorize(access_token, user_id)
 
     async def refresh_user(self, user, handler=None):
-        auth_state = await user.get_auth_state()
-        access_token = auth_state.get("access_token", "")
-        user_id = await self._get_user_id(access_token)
-
         try:
+            auth_state = await user.get_auth_state()
+            if auth_state is None:
+                return False
+            access_token = auth_state.get("access_token", "")
+            user_id = await self._get_user_id(access_token)
             return await self.authorize(access_token, user_id)
         except Exception:
             self.log.error("Failed to refresh user", exc_info=True)
