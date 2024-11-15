@@ -22,7 +22,6 @@ from .authenticator import FBAuthenticator
 
 
 class FBDelegateBearerAuthenticator(FBAuthenticator):
-
     EXPECTED_ERROR_CODES = [400, 401, 403]
 
     # Override if necessary

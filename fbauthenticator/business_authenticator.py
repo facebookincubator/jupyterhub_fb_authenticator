@@ -20,7 +20,6 @@ from .authenticator import FBAuthenticator
 
 
 class FBBusinessAuthenticator(FBAuthenticator):
-
     scope = ["business_management", "email"]
 
     BUSINESS_ID = os.environ.get("BUSINESS_ID")
